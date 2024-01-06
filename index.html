@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8">
+    <script type="module" src="script.js"></script>
+    <title>Download compressed data</title>
+  </head>
+  <body>
+
+    <p>
+      <label for="file-selector">decompress/compress file</label>
+      <input type="file" id="file-selector" accept=".gz .json .html"/>
+    </p>
+
+<script>
+  document.getElementById("file-selector").addEventListener("change", (event) => {
+  const selectedFile = event.target.files[0];
+  if(selectedFile.type === "application/gzip"){
+    const fileName = selectedFile.name.replace(".gz", "");
+    decompressAndDownloadBlob(selectedFile,fileName)
+    return
+  }
+
+  else {
+    const fileName = selectedFile.name + ".gz";
+    compressAndDownloadData(selectedFile,fileName)
+  }
+});
+
+// Ref:
+// https://developer.mozilla.org/en-US/docs/Web/API/Compression_Streams_API
+// https://dev.to/samternent/json-compression-in-the-browser-with-gzip-and-the-compression-streams-api-4135
+
+
+/**
+ * Converts data to a JSON Blob.
+ * @param {Object} data - The data to be converted to a JSON Blob.
+ * @returns {Blob} The JSON Blob created from the data.
+ */
+function dataToBlob(data) {
+  try {
+    if(data instanceof File){
+      return data
+    }
+    if(typeof data == "object"){
+      return new Blob([JSON.stringify(data)], {
+        type: "application/json",
+      });
+    }
+    else {
+      return console.error("Data was not a file nor a object:", error);
+    }
+
+  } catch (error) {
+    console.error("Error in dataToBlob:", error);
+    throw error;
+  }
+}
+
+/**
+ * Converts JSON Blob to data.
+ * @param {Blob} - The data to be converted to a JSON Blob.
+ * @returns {Object} data - The JSON Blob created from the data.
+ */
+async function blobToData(blob) {
+    try {
+      return JSON.parse(await blob.text());
+    } catch (error) {
+      console.error("Error in blobToData:", error);
+      throw error;
+    }
+  }
+
+/**
+ * Converts JSON Blob to a stream.
+ * @param {Blob} blob - The JSON Blob to be converted to a readable stream.
+ * @returns {ReadableStream} The stream created from the JSON Blob.
+ */
+function blobToStream(blob) {
+  try {
+    return blob.stream();
+  } catch (error) {
+    console.error("Error in blobToStream:", error);
+    throw error; // Re-throwing the error for upstream handling
+  }
+}
+
+/**
+ * Converts a stream back to a Blob.
+ * @param {ReadableStream} stream - The stream to be converted.
+ * @returns {Promise<Blob>} The resulting compressed Blob.
+ */
+async function streamToBlob(stream) {
+  try {
+    return await new Response(stream).blob();
+  } catch (error) {
+    console.error("Error in streamToBlob:", error);
+    throw error;
+  }
+}
+
+/**
+ * Compresses a given ReadableStream using gzip compression.
+ * @param {ReadableStream} stream - The stream to be compressed.
+ * @returns {Promise<ReadableStream>} The compressed stream.
+ */
+async function compressStream(stream) {
+  try {
+    return stream.pipeThrough(new CompressionStream("gzip"));
+  } catch (error) {
+    console.error("Error in compressStream:", error);
+    throw error;
+  }
+}
+
+/**
+ * Decompress a given ReadableStream using gzip compression.
+ * @param {ReadableStream} stream - The stream to be decompressed.
+ * @returns {Promise<ReadableStream>} The decompressed stream.
+ */
+async function decompressStream(stream) {
+  try {
+    return stream.pipeThrough(new DecompressionStream("gzip"));
+  } catch (error) {
+    console.error("Error in decompressStream:", error);
+    throw error;
+  }
+}
+
+/**
+ * Decompress a compressed Blob using gzip compression.
+ * @param {Promise<Blob>} - The stream to be decompressed.
+ * @returns {Blob} blob - The decompressed JSON Blob.
+ */
+async function decompressBlob(blob) {
+    try {
+        const compressedStream = blobToStream(blob);
+        const decompressedStream = await decompressStream(compressedStream);
+        return await streamToBlob(decompressedStream);
+    } catch (error) {
+      console.error("Error in decompressBlob:", error);
+      throw error;
+    }
+  }
+
+/**
+ * Initiates a download of the given Blob.
+ * @param {Blob} blob - The Blob to be downloaded.
+ * @param {string} filename - The name of the file to be downloaded.
+ */
+function downloadBlob(blob, filename = "download") {
+  try {
+    const downloadLink = document.createElement("a");
+    downloadLink.download = filename;
+    downloadLink.href = window.URL.createObjectURL(blob);
+
+    downloadLink.addEventListener("click", function () {
+      // Revoke the object URL on the next tick of the event loop
+      setTimeout(() => window.URL.revokeObjectURL(this.href), 0);
+    });
+
+    downloadLink.click();
+  } catch (error) {
+    console.error("Error in downloadBlob:", error);
+  }
+}
+
+/**
+ * Compresses the given data to a Blob.
+ * @param {Object} data - The data to be compressed.
+ * @returns {Promise<Blob>} The compressed data as a Blob.
+ */
+async function compressData(data) {
+  try {
+    const blob = dataToBlob(data);
+    const stream = blobToStream(blob);
+    const compressedStream = await compressStream(stream);
+    return await streamToBlob(compressedStream);
+  } catch (error) {
+    console.error("Error in compressData:", error);
+    throw error;
+  }
+}
+
+/**
+ * Compresses data to a Blob and initiates its download.
+ * @param {Object} data - The data to be compressed and downloaded.
+ * @param {string} filename - The name of the file to be downloaded.
+ */
+async function compressAndDownloadData(data, filename) {
+  try {
+    const blob = await compressData(data);
+    downloadBlob(blob, filename);
+  } catch (error) {
+    console.error("Error in compressAndDownloadData:", error);
+  }
+}
+
+/**
+ * Decompress a Blob and initiates its download.
+ * @param {Blob} blob - The data to be compressed and downloaded.
+ * @param {string} filename - The name of the file to be downloaded.
+ */
+async function decompressAndDownloadBlob(blob, filename) {
+  try {
+    const decompressedBlob = await decompressBlob(blob);
+    downloadBlob(decompressedBlob, filename)
+  } catch (error) {
+    console.error("Error in decompressAndDownloadData:", error);
+  }
+}
+</script>
+  </body>
+</html>
