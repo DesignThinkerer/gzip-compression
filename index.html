@@ -8,83 +8,46 @@
 
     <p>
       <label for="file-selector">decompress/compress file</label>
-      <input type="file" id="file-selector" accept=".gz .json .html"/>
+      <input type="file" id="file-selector"/>
     </p>
 
-<script>
-// Ref:
-// https://developer.mozilla.org/en-US/docs/Web/API/Compression_Streams_API
-// https://dev.to/samternent/json-compression-in-the-browser-with-gzip-and-the-compression-streams-api-4135
+    <script>
+      document.getElementById("file-selector").addEventListener("change", (event) => {
+        const selectedFile = event.target.files[0];
 
-  document.getElementById("file-selector").addEventListener("change", (event) => {
-  const selectedFile = event.target.files[0];
-  if(selectedFile.type === "application/gzip"){
-    const fileName = selectedFile.name.replace(".gz", "");
-    decompressAndDownload(selectedFile,fileName)
-    return
-  }
-
-  else {
-    const fileName = selectedFile.name + ".gz";
-    compressAndDownload(selectedFile,fileName)
-  }
-});
-
-
-/**
- * Initiates a download of the given Blob.
- * @param {Blob} blob - The Blob to be downloaded.
- * @param {string} filename - The name of the file to be downloaded.
- */
- function download(blob, filename = "download") {
-  try {
-    const downloadLink = document.createElement("a");
-    downloadLink.href = window.URL.createObjectURL(blob);
-    downloadLink.download = filename;
-    document.body.appendChild(downloadLink); // Append to body to ensure visibility in certain browsers
-    downloadLink.click();
-    document.body.removeChild(downloadLink); // Clean up
-    window.URL.revokeObjectURL(downloadLink.href); // Revoke the URL
-  } catch (error) {
-    console.error("Error in download:", error);
-    throw error; // Rethrow to allow higher-level handling
-  }
-}
-
-/**
- * Compresses data to a Blob and initiates its download.
- * @param {Object} data - The data to be compressed and downloaded.
- * @param {string} filename - The name of the file to be downloaded.
- * @throws {Error} - Throws an error if compression or download fails.
- */
-async function compressAndDownload(data, filename) {
-  try {
-    const cs = await data.stream().pipeThrough(new CompressionStream("gzip"));
-    const compressedBlob = await new Response(cs).blob();
-    download(compressedBlob, filename);
-  } catch (error) {
-    console.error("Error in compressAndDownload:", error);
-    throw error;
-  }
-}
-
-/**
- * Decompress a Blob and initiates its download.
- * @param {Blob} blob - The data to be decompressed and downloaded.
- * @param {string} filename - The name of the file to be downloaded.
- * @throws {Error} - Throws an error if decompression or download fails.
- */
-async function decompressAndDownload(blob, filename) {
-  try {
-    const ds = await blob.stream().pipeThrough(new DecompressionStream("gzip"));
-    const decompressedBlob = await new Response(ds).blob();
-    download(decompressedBlob, filename);
-  } catch (error) {
-    console.error("Error in decompressAndDownload:", error);
-    throw error;
-  }
-}
-
-</script>
-  </body>
+        if(selectedFile.type === "application/gzip"){
+          console.log("starting to decompress, please wait..")
+          const fileName = selectedFile.name.replace(".gz", "");
+          decompress(selectedFile, fileName);
+        }
+        else {
+          console.log("starting to compress, please wait..")
+          const fileName = selectedFile.name + ".gz";
+          compress(selectedFile, fileName);
+        }
+      });
+    
+      function download(blob, fileName = "download") {
+        const downloadLink = document.createElement("a");
+        downloadLink.href = window.URL.createObjectURL(blob);
+        downloadLink.download = fileName;
+        downloadLink.click();
+        window.URL.revokeObjectURL(downloadLink.href);
+      }
+    
+      async function compress(blob, fileName) {
+        const cs = blob.stream().pipeThrough(new CompressionStream("gzip"));
+        const file = await new Response(cs).blob();
+        console.log("finished compression")
+        download(file, fileName);
+      }
+    
+      async function decompress(blob, fileName) {
+        const ds = blob.stream().pipeThrough(new DecompressionStream("gzip"));
+        const file = await new Response(ds).blob();
+        console.log("finished decompression")
+        download(file, fileName);
+      }
+    </script>
+      </body>
 </html>
