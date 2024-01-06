@@ -1,2 +1,2 @@
 # gzip-compression
-Compress data using the gzip algorithm
+Compress data in the browser using the Compression Streams API
